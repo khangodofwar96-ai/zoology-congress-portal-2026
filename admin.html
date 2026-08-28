@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organizer Portal - Download All Papers</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: #f8fafc; padding: 30px; margin: 0; }
+    .wrapper { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 20px; }
+    h1 { color: #1b4332; font-size: 22px; }
+    .btn-zip { background: #2d6a4f; color: white; border: none; padding: 12px 24px; font-weight: bold; font-size: 15px; border-radius: 6px; cursor: pointer; }
+    .btn-zip:hover { background: #1b4332; }
+    .btn-zip:disabled { background: #cbd5e1; cursor: not-allowed; }
+    #progressText { color: #2d6a4f; font-weight: 600; margin-bottom: 15px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; font-size: 14px; }
+    th { background: #f1f5f9; color: #1e293b; font-weight: 700; }
+    tr:nth-child(even) { background: #f8fafc; }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+  <div class="top-bar">
+    <h1>Zoological Congress Admin Dashboard</h1>
+    <button class="btn-zip" id="zipBtn" onclick="downloadAllAsZip()">📦 Download All Papers (.ZIP)</button>
+  </div>
+
+  <div id="progressText"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Author</th>
+        <th>Email</th>
+        <th>Category</th>
+        <th>Paper Title</th>
+      </tr>
+    </thead>
+    <tbody id="submissionsTable">
+      <tr><td colspan="5">Loading submitted papers...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // Insert your Supabase details here
+  const SUPABASE_URL = 'https://uqpzqwdcsuqbsyozlchb.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcHpxd2Rjc3VxYnN5b3psY2hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDkzODIsImV4cCI6MjEwMzQ4NTM4Mn0.CwM87DpC7-6NFOm-QOMtW2zwze0yajLwSGrHWAAN__g';
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let submissionsList = [];
+
+  async function fetchSubmissions() {
+    const tableBody = document.getElementById('submissionsTable');
+    const { data, error } = await supabase
+      .from('submissions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      tableBody.innerHTML = `<tr><td colspan="5" style="color:red">Error loading records: ${error.message}</td></tr>`;
+      return;
+    }
+
+    submissionsList = data;
+    if (data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="5">No submissions found yet.</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = '';
+    data.forEach(item => {
+      const dateStr = new Date(item.created_at).toLocaleDateString();
+      tableBody.innerHTML += `
+        <tr>
+          <td>${dateStr}</td>
+          <td><b>${item.author_name}</b></td>
+          <td>${item.email}</td>
+          <td>${item.category}</td>
+          <td>${item.paper_title}</td>
+        </tr>
+      `;
+    });
+  }
+
+  async function downloadAllAsZip() {
+    if (submissionsList.length === 0) {
+      alert("No files available to download.");
+      return;
+    }
+
+    const zipBtn = document.getElementById('zipBtn');
+    const progressText = document.getElementById('progressText');
+    zipBtn.disabled = true;
+
+    const zip = new JSZip();
+    const mainFolder = zip.folder("Pakistan_Zoology_Congress_Submissions");
+
+    let count = 0;
+    for (const item of submissionsList) {
+      count++;
+      progressText.innerText = `Downloading file ${count} of ${submissionsList.length}: ${item.author_name}...`;
+
+      const { data: fileBlob, error } = await supabase.storage
+        .from('abstracts-and-papers')
+        .download(item.file_path);
+
+      if (!error && fileBlob) {
+        const fileExtension = item.file_path.split('.').pop();
+        const cleanAuthor = item.author_name.replace(/[^a-zA-Z0-9]/g, '_');
+        // Organized inside ZIP by category folders
+        const zipPath = `${item.category}/${cleanAuthor}_${item.id.slice(0, 4)}.${fileExtension}`;
+        mainFolder.file(zipPath, fileBlob);
+      }
+    }
+
+    progressText.innerText = "Compressing files into ZIP format...";
+    const compressedZip = await zip.generateAsync({ type: "blob" });
+
+    saveAs(compressedZip, "Pakistan_Zoology_Congress_All_Submissions.zip");
+    progressText.innerText = "Download complete! ZIP saved to your PC.";
+    zipBtn.disabled = false;
+  }
+
+  fetchSubmissions();
+</script>
+</body>
+</html>
