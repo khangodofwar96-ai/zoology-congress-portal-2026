@@ -54,8 +54,10 @@
   <div class="login-box">
     <h2>Organizer Access</h2>
     <p style="font-size: 13px; color: #64748b;">Enter password to view submissions</p>
-    <input type="password" id="passInput" placeholder="Enter Password" onkeypress="handleKeyPress(event)">
-    <button onclick="checkPassword()">Login</button>
+    <form id="loginForm" onsubmit="handleLoginSubmit(event)">
+      <input type="password" id="passInput" placeholder="Enter Password" autocomplete="current-password" required>
+      <button type="submit">Login</button>
+    </form>
     <div id="loginError">Incorrect password!</div>
   </div>
 </div>
@@ -86,22 +88,28 @@
 </div>
 
 <script>
-  // 🔑 SET YOUR ADMIN PASSWORD HERE
+  // 🔑 ADMIN PASSWORD
   const ADMIN_PASSWORD = "Zoology2026Password!"; 
 
-  // Insert your Supabase details here
+  // Supabase Initialization
   const SUPABASE_URL = 'https://uqpzqwdcsuqbsyozlchb.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcHpxd2Rjc3VxYnN5b3psY2hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDkzODIsImV4cCI6MjEwMzQ4NTM4Mn0.CwM87DpC7-6NFOm-QOMtW2zwze0yajLwSGrHWAAN__g';
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+  // Renamed client variable to prevent overwriting global supabase library
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let submissionsList = [];
+
+  function handleLoginSubmit(e) {
+    e.preventDefault();
+    checkPassword();
+  }
 
   function checkPassword() {
     const entered = document.getElementById('passInput').value;
     const errorDiv = document.getElementById('loginError');
 
     if (entered === ADMIN_PASSWORD) {
-      // Hide lock overlay and reveal admin dashboard
       document.getElementById('loginOverlay').style.display = 'none';
       document.getElementById('adminContent').style.display = 'block';
       fetchSubmissions();
@@ -111,15 +119,9 @@
     }
   }
 
-  function handleKeyPress(e) {
-    if (e.key === 'Enter') {
-      checkPassword();
-    }
-  }
-
   async function fetchSubmissions() {
     const tableBody = document.getElementById('submissionsTable');
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('submissions')
       .select('*')
       .order('created_at', { ascending: false });
@@ -168,7 +170,7 @@
       count++;
       progressText.innerText = `Downloading file ${count} of ${submissionsList.length}: ${item.author_name}...`;
 
-      const { data: fileBlob, error } = await supabase.storage
+      const { data: fileBlob, error } = await supabaseClient.storage
         .from('abstracts-and-papers')
         .download(item.file_path);
 
