@@ -93,7 +93,6 @@
   const SUPABASE_URL = 'https://uqpzqwdcsuqbsyozlchb.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcHpxd2Rjc3VxYnN5b3psY2hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDkzODIsImV4cCI6MjEwMzQ4NTM4Mn0.CwM87DpC7-6NFOm-QOMtW2zwze0yajLwSGrHWAAN__g';
   
-  // Solved crash: Uses window.supabase to avoid variable shadowing
   const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let submissionsList = [];
@@ -174,8 +173,12 @@
 
       if (!error && fileBlob) {
         const fileExtension = item.file_path.split('.').pop();
+        
+        // Formats file name as: AuthorName_PaperTitle.extension
         const cleanAuthor = item.author_name.replace(/[^a-zA-Z0-9]/g, '_');
-        const zipPath = `${item.category}/${cleanAuthor}_${item.id.slice(0, 4)}.${fileExtension}`;
+        const cleanTitle = item.paper_title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
+        
+        const zipPath = `${item.category}/${cleanAuthor}_${cleanTitle}.${fileExtension}`;
         mainFolder.file(zipPath, fileBlob);
       }
     }
